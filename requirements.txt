@@ -1,0 +1,26 @@
+streamlit
+pandas
+matplotlib
+
+
+
+
+Claim sessions for customers doing business with us via Truck Share 24/7.
+Review each session for accuracy while answering any questions the customer may have.
+Determine the proper course of action utilizing instructional materials reviewed.
+Make outbound calls for verification of alternate contacts.
+Communicate with the customer via phone or chat in an efficient and courteous manner.
+Ensure compliance with the U-Haul policies in order to retain customer loyalty and prevent the re-occurrence of objections.
+Review telephone, mail, and internet procedures for each communication received and respond a reply to each assigned customer with a specific time frame.
+Listen to customer concerns, documenting them and resolving when able.
+Requirements:
+
+Good listening, verbal, and written communication skills in English.
+Inbound call/phone experience (high volume highly preferred).
+Excellent customer service skills with 1 year of phone customer service experience.
+Technically savvy preferred.
+Logic, reasoning, time management, and facial recognition skills.                      
+Proficiency, attention to detail, and interpersonal skills.
+Ability to multitask and assist multiple customers at one time (online sessions).
+Once trained for phones agents will be required to simultaneously assist customers online and on inbound phone calls.
+Reasonable and predictable attendance. 
