@@ -735,6 +735,7 @@ def fetch_pitching_staff(team_id):
 # ----------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 🚚 LOAD THE TRUCK")
+    st.link_button("💬 Join the FREE Discord", "https://discord.gg/nCfsd4cxBB", width='stretch')
 
     st.markdown("---")
     st.markdown("### 📡 Data source")
@@ -750,18 +751,18 @@ with st.sidebar:
     with st.expander("📖 How To Use", expanded=False):
         st.markdown("**Hitter stats**")
         howto_hitter_rows = [
-            ("Higher BarrelScore", "good"),
+            ("Higher CEIL", "good"),
             ("Higher MatchupScore", "good"),
-            ("Higher ZoneFit", "good"),
-            ("Higher HR Form", "good"),
-            ("Higher kHR", "good"),
+            ("Higher ZONE", "good"),
+            ("Higher FORM", "good"),
+            ("Higher KHR", "good"),
             ("Higher ISO", "good"),
             ("Higher xwOBA", "good"),
-            ("Higher xwOBAcon", "good"),
-            ("Lower SwStr", "good"),
-            ("Higher PulledBrl%", "good"),
-            ("Higher Brl/BIP%", "good"),
-            ("Higher SweetSpot%", "good"),
+            ("Higher xwOBAC", "good"),
+            ("Lower SwStr%", "good"),
+            ("Higher PBRL%", "good"),
+            ("Higher BRL%", "good"),
+            ("Higher SwSp%", "good"),
             ("Higher FB%", "good"),
             ("Higher HR_FB%", "good"),
         ]
@@ -772,7 +773,12 @@ with st.sidebar:
             )
         st.markdown(
             f'<div class="howto-row">Very high HH% = <span class="howto-good">good</span> '
-            f'<span class="howto-caveat">*can sometimes be ignored depending on Barrel%</span></div>',
+            f'<span class="howto-caveat">*can sometimes be ignored depending on BRL%</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="howto-row">Trend arrows (FORM only): '
+            '↑ = trending up/hot &middot; → = flat/stable &middot; ↓ = trending down/cold</div>',
             unsafe_allow_html=True,
         )
 
@@ -796,11 +802,11 @@ with st.sidebar:
 
         st.markdown("---")
         st.caption(
-            "🟢 Real Baseball Savant / FanGraphs data: ISO, xwOBA, xwOBAcon, Brl/BIP%, "
-            "SweetSpot%, HH%, BarrelScore, and (for pitchers) xwOBA allowed, Barrel BIP%, "
+            "🟢 Real Baseball Savant / FanGraphs data: ISO, xwOBA, xwOBAC, BRL%, "
+            "SwSp%, HH%, CEIL, and (for pitchers) xwOBA allowed, Barrel BIP%, "
             "Hard Hit%, CSW%, SwStr%.\n\n"
             "🟡 Estimated/proprietary composites (not published by Savant): MatchupScore, "
-            "ZoneFit, HR Form%, kHR, PulledBrl%, FB%, LA, HR_FB%, Pitcher Score, "
+            "ZONE, FORM, KHR, PBRL%, FB%, LA, HR_FB%, Pitcher Score, "
             "Strikeout Score, Ball%."
         )
 
@@ -1075,14 +1081,17 @@ def batter_stats_for(pid, name):
     pa = d.get("pa", LEAGUE_AVG_B["pa"])
     has_real = bool(d)
 
-    # 20-80 scouting scale: MLB-average barrel rate (~8%) should land near 50 (average)
-    barrel_score = round(min(max(20 + (barrel_pct / 16) * 60, 20), 80), 1)
+    # CEIL: 0-100 score (not the old 20-80 scouting scale). MLB-average barrel
+    # rate (~8%) lands near 50; this is used for the "CEIL" column and as an
+    # input to other composites below.
+    barrel_score = round(max(0.0, min(100.0, (barrel_pct / 16) * 100)), 3)
 
     rnd = random.Random((pid or abs(hash(name))) % 1_000_000)
     matchup_score = round(min(max(35 + (xwoba - 0.280) * 250 + rnd.uniform(-6, 6), 20), 85), 1)
     zonefit = round(max(0.03, min(0.14, 0.06 + (barrel_pct / 100) + rnd.uniform(-0.01, 0.01))), 3)
-    hr_form_pct = int(min(max((barrel_score - 20) / 60 * 70 + rnd.randint(-8, 12), 5), 95))
+    hr_form_pct = int(min(max((barrel_score / 100) * 70 + rnd.randint(-8, 12), 5), 95))
     khr = round(max(0.0, (barrel_score / 100) * 22 + iso * 40 + rnd.uniform(-2, 2)), 1)
+    khr_score = round(max(0.0, min(100.0, (khr / 45) * 100)), 3)
     pulled_brl_pct = round(barrel_pct * 0.62, 1)
     fb_pct = round(max(15, min(50, 33 + (barrel_pct - 8) * 0.8 + rnd.uniform(-4, 4))), 1)
     la = round(max(2, min(22, 11 + (fb_pct - 33) * 0.2 + rnd.uniform(-2, 2))), 1)
@@ -1091,7 +1100,8 @@ def batter_stats_for(pid, name):
 
     return {
         "barrel_score": barrel_score, "matchup_score": matchup_score, "zonefit": zonefit,
-        "hr_form_pct": hr_form_pct, "khr": khr, "iso": iso, "xwoba": xwoba, "xwobacon": xwobacon,
+        "hr_form_pct": hr_form_pct, "khr": khr, "khr_score": khr_score,
+        "iso": iso, "xwoba": xwoba, "xwobacon": xwobacon,
         "swstr_pct": swstr_pct, "pulled_brl_pct": pulled_brl_pct, "brl_bip_pct": barrel_pct,
         "sweet_spot_pct": sweet_spot_pct, "fb_pct": fb_pct, "hh_pct": hard_hit_pct, "la": la,
         "hr_fb_pct": hr_fb_pct, "bbe": bbe, "pa": pa, "has_real": has_real,
@@ -1572,22 +1582,22 @@ def build_lineup_df(roster_raw, team_code):
             {
                 "Player": f"★ {p['name']}" if star else p["name"],
                 "Logo": f"https://www.mlbstatic.com/team-logos/{TEAMS.get(team_code, {}).get('id', '')}.svg",
-                "BarrelScore": s["barrel_score"],
+                "CEIL": s["barrel_score"],
                 "MatchupScore": s["matchup_score"],
-                "ZoneFit": s["zonefit"],
-                "HR Form": f'{s["hr_form_pct"]}% {"↑" if s["hr_form_pct"] >= 55 else ("→" if s["hr_form_pct"] >= 40 else "↓")}',
-                "kHR": s["khr"],
-                "Hist Pitches": int(round(s["pa"] * 3.9)),
-                "Hist BIP": s["bbe"],
+                "ZONE": s["zonefit"],
+                "FORM": f'{s["hr_form_pct"]}% {"↑" if s["hr_form_pct"] >= 55 else ("→" if s["hr_form_pct"] >= 40 else "↓")}',
+                "KHR": s["khr_score"],
+                "PIT": int(round(s["pa"] * 3.9)),
+                "BIP": s["bbe"],
                 "ISO": s["iso"],
                 "xwOBA": s["xwoba"],
-                "xwOBAcon": s["xwobacon"],
-                "SwStr": s["swstr_pct"],
-                "PulledBrl": s["pulled_brl_pct"],
-                "Brl/BIP%": s["brl_bip_pct"],
-                "SweetSpot": s["sweet_spot_pct"],
+                "xwOBAC": s["xwobacon"],
+                "SwStr%": s["swstr_pct"],
+                "PBRL%": s["pulled_brl_pct"],
+                "BRL%": s["brl_bip_pct"],
+                "SwSp%": s["sweet_spot_pct"],
                 "FB%": s["fb_pct"],
-                "HH": s["hh_pct"],
+                "HH%": s["hh_pct"],
                 "LA": s["la"],
                 "HR_FB%": s["hr_fb_pct"],
             }
@@ -1596,16 +1606,16 @@ def build_lineup_df(roster_raw, team_code):
 
 
 numeric_cols = [
-    "BarrelScore", "MatchupScore", "ZoneFit", "ISO", "xwOBA", "xwOBAcon",
-    "SwStr", "PulledBrl", "Brl/BIP%", "SweetSpot", "FB%", "HH", "LA", "HR_FB%", "kHR",
+    "CEIL", "MatchupScore", "ZONE", "ISO", "xwOBA", "xwOBAC",
+    "SwStr%", "PBRL%", "BRL%", "SwSp%", "FB%", "HH%", "LA", "HR_FB%", "KHR",
 ]
 
 fmt = {
-    "BarrelScore": "{:.1f}", "MatchupScore": "{:.1f}",
-    "ZoneFit": "{:.3f}", "ISO": "{:.3f}", "xwOBA": "{:.3f}", "xwOBAcon": "{:.3f}",
-    "SwStr": "{:.1f}", "PulledBrl": "{:.1f}", "Brl/BIP%": "{:.1f}", "SweetSpot": "{:.1f}",
-    "FB%": "{:.1f}", "HH": "{:.1f}", "LA": "{:.1f}", "HR_FB%": "{:.1f}", "kHR": "{:.1f}",
-    "Hist Pitches": "{:,}", "Hist BIP": "{:,}",
+    "CEIL": "{:.3f}", "MatchupScore": "{:.1f}",
+    "ZONE": "{:.3f}", "ISO": "{:.3f}", "xwOBA": "{:.3f}", "xwOBAC": "{:.3f}",
+    "SwStr%": "{:.1f}%", "PBRL%": "{:.1f}%", "BRL%": "{:.1f}%", "SwSp%": "{:.1f}%",
+    "FB%": "{:.1f}%", "HH%": "{:.1f}%", "LA": "{:.1f}", "HR_FB%": "{:.1f}", "KHR": "{:.3f}",
+    "PIT": "{:,}", "BIP": "{:,}",
 }
 
 logo_col_config = {"Logo": st.column_config.ImageColumn("Logo", width="small")}
@@ -1795,12 +1805,113 @@ if pitcher_rows:
 else:
     st.caption("No probable pitchers are posted for this slate yet.")
 
+# ----------------------------------------------------------------------
+# Top Slate Hitters
+# ----------------------------------------------------------------------
+st.markdown('<div class="section-title">Top Slate Hitters</div>', unsafe_allow_html=True)
+
+hitters_header_col1, hitters_header_col2 = st.columns([3, 1])
+with hitters_header_col1:
+    st.markdown(
+        '<div class="page-subtitle" style="margin-top:6px;">Best bats across the full slate</div>',
+        unsafe_allow_html=True,
+    )
+with hitters_header_col2:
+    hitters_sort_label = st.segmented_control(
+        "Sort by", ["Matchup", "kHR"], default="Matchup", label_visibility="collapsed",
+    ) or "Matchup"
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _cached_team_roster_live(team_id):
+    return fetch_active_hitters(team_id)
+
+
+def get_team_roster(team_code):
+    """Same live-with-demo-fallback pattern used for the selected game, generalized to any team."""
+    live_roster = _cached_team_roster_live(TEAMS.get(team_code, {}).get("id")) if live_mode_active else None
+    if live_roster:
+        return live_roster
+    return [{"id": None, "name": n} for n, _ in demo_roster(team_code)]
+
+
+slate_hitter_rows = []
+for g in GAME_SLATE:
+    game_label = f"{g['away']} @ {g['home']}"
+    for team_code, opp_code in ((g["away"], g["home"]), (g["home"], g["away"])):
+        roster = get_team_roster(team_code)
+        for p in roster:
+            s = batter_stats_for(p["id"], p["name"])
+            likely_score = round(
+                0.5 * s["matchup_score"] + 0.3 * s["barrel_score"] * 0.45 + 0.2 * s["khr_score"] * 0.45, 1
+            )
+            slate_hitter_rows.append(
+                {
+                    "Hitter Name": p["name"],
+                    "Matchup": s["matchup_score"],
+                    "Ceiling": s["barrel_score"],
+                    "Zone Fit": s["zonefit"],
+                    "kHR": s["khr_score"],
+                    "HR Form": f'{s["hr_form_pct"]}% {"↑" if s["hr_form_pct"] >= 55 else ("→" if s["hr_form_pct"] >= 40 else "↓")}',
+                    "PIT": int(round(s["pa"] * 3.9)),
+                    "BIP": s["bbe"],
+                    "ISO": s["iso"],
+                    "xWOBA": s["xwoba"],
+                    "xWOBAC": s["xwobacon"],
+                    "SwStr%": s["swstr_pct"],
+                    "PullBRL%": s["pulled_brl_pct"],
+                    "Brl/BIP%": s["brl_bip_pct"],
+                    "FB%": s["fb_pct"],
+                    "HH%": s["hh_pct"],
+                    "LA": s["la"],
+                    "Likely": likely_score,
+                    "Game": game_label,
+                    "Oppo": f"https://www.mlbstatic.com/team-logos/{TEAMS.get(opp_code, {}).get('id', '')}.svg",
+                }
+            )
+
+if slate_hitter_rows:
+    sort_col = "Matchup" if hitters_sort_label == "Matchup" else "kHR"
+    df_slate_hitters = (
+        pd.DataFrame(slate_hitter_rows).sort_values(sort_col, ascending=False).reset_index(drop=True)
+    )
+
+    hitters_numeric_cols = [
+        "Matchup", "Ceiling", "Zone Fit", "kHR", "ISO", "xWOBA", "xWOBAC",
+        "SwStr%", "PullBRL%", "Brl/BIP%", "FB%", "HH%", "LA", "Likely",
+    ]
+    hitters_fmt = {
+        "Matchup": "{:.3f}", "Ceiling": "{:.3f}", "Zone Fit": "{:.3f}", "kHR": "{:.3f}",
+        "ISO": "{:.3f}", "xWOBA": "{:.3f}", "xWOBAC": "{:.3f}",
+        "SwStr%": "{:.1f}", "PullBRL%": "{:.1f}", "Brl/BIP%": "{:.1f}",
+        "FB%": "{:.1f}", "HH%": "{:.1f}", "LA": "{:.1f}", "Likely": "{:.1f}",
+        "PIT": "{:,}", "BIP": "{:,}",
+    }
+
+    styled_slate_hitters = (
+        df_slate_hitters.style
+        .background_gradient(subset=hitters_numeric_cols, cmap="RdYlGn", axis=0)
+        .format(hitters_fmt)
+    )
+    st.caption(f"{len(df_slate_hitters):,} rows")
+    st.dataframe(
+        styled_slate_hitters, width='stretch', height=480, hide_index=True,
+        column_config={"Oppo": st.column_config.ImageColumn("Oppo", width="small")},
+    )
+    st.caption(
+        "\"Likely\" is a house-made composite blending Matchup, Ceiling, and kHR into one ranking "
+        "number -- not a published Savant stat. Everything else follows the same real-vs-estimated "
+        "split noted in How To Use."
+    )
+else:
+    st.caption("No hitters available to rank for this slate yet.")
+
 if live_mode_active:
     st.caption(
         f"🚚 LOAD THE TRUCK — live mode: schedule, rosters, and probable pitchers from the free "
-        f"MLB Stats API; ISO, xwOBA, xwOBAcon, Brl/BIP%, SweetSpot%, HH%, and BarrelScore from free "
+        f"MLB Stats API; ISO, xwOBA, xwOBAC, BRL%, SwSp%, HH%, and CEIL from free "
         f"Baseball Savant / FanGraphs leaderboards ({STATS_YEAR} season) via the open-source pybaseball "
-        f"library, matched by MLB player ID. MatchupScore, ZoneFit, HR Form%, kHR, PulledBrl%, FB%, LA, "
+        f"library, matched by MLB player ID. MatchupScore, ZONE, FORM, KHR, PBRL%, FB%, LA, "
         f"HR_FB%, Pitcher Score, Strikeout Score, and Ball% are house-made composites derived from those "
         f"real inputs, not published Savant fields. Weather is still simulated."
     )
